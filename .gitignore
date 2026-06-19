@@ -1,0 +1,13 @@
+# Binaries
+/rieproxy
+/bin/
+/dist/
+
+# Test / coverage output
+*.out
+coverage.*
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store

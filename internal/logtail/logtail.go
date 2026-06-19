@@ -1,0 +1,105 @@
+// Package logtail is an optional helper that streams a docker container's logs
+// to stderr with generic, framework-agnostic colorization. It is opt-in: the
+// proxy only tails containers named via the --logs flag.
+package logtail
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/vichugofsl/rieproxy/internal/ansi"
+)
+
+var reGinStatus = regexp.MustCompile(`\|\s*(\d{3})\s*\|`)
+
+// Tail streams stdout+stderr from a docker container, colorizing each line and
+// writing it to stderr. It blocks until ctx is cancelled or the stream ends.
+func Tail(ctx context.Context, container string) {
+	prefix := ansi.Magenta + ansi.Bold + "[" + container + "]" + ansi.Reset + " "
+	tail(ctx, container, func(line string) {
+		fmt.Fprintln(os.Stderr, prefix+Colorize(line))
+	})
+}
+
+func tail(ctx context.Context, container string, process func(string)) {
+	// Only show logs from ~now onward, not the container's whole history.
+	since := strconv.FormatInt(time.Now().Add(-10*time.Second).Unix(), 10)
+	cmd := exec.CommandContext(ctx, "docker", "logs", "-f", "--since", since, container)
+
+	// Merge container stdout and stderr into one pipe so we see all output.
+	r, w, err := os.Pipe()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s[rieproxy]%s could not create pipe for %s logs: %v\n", ansi.Red, ansi.Reset, container, err)
+		return
+	}
+	cmd.Stdout = w
+	cmd.Stderr = w
+
+	if err := cmd.Start(); err != nil {
+		_ = w.Close()
+		_ = r.Close()
+		fmt.Fprintf(os.Stderr, "%s[rieproxy]%s could not tail %s (is docker available?): %v\n", ansi.Red, ansi.Reset, container, err)
+		return
+	}
+	_ = w.Close() // parent does not write; close so the reader sees EOF when the child exits
+
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(make([]byte, 256*1024), 256*1024)
+	for scanner.Scan() {
+		process(scanner.Text())
+	}
+	_ = r.Close()
+	_ = cmd.Wait()
+}
+
+// Colorize applies generic colorization to a single log line: slog-style
+// "level=" lines, Gin request logs, Gin debug output, and Lambda lifecycle
+// markers. Unrecognized lines are returned unchanged.
+func Colorize(line string) string {
+	switch {
+	case strings.Contains(line, "level=ERROR"):
+		return ansi.Red + ansi.Bold + line + ansi.Reset
+	case strings.Contains(line, "level=WARN"):
+		return ansi.Yellow + line + ansi.Reset
+	case strings.Contains(line, "level=INFO"):
+		return ansi.Green + line + ansi.Reset
+	case strings.Contains(line, "level=DEBUG"):
+		return ansi.Cyan + line + ansi.Reset
+	}
+
+	switch {
+	case strings.HasPrefix(line, "[GIN]"):
+		return colorizeGin(line)
+	case strings.HasPrefix(line, "[GIN-debug]"):
+		return ansi.Gray + line + ansi.Reset
+	case strings.HasPrefix(line, "START "), strings.HasPrefix(line, "END "), strings.HasPrefix(line, "REPORT "):
+		return ansi.Magenta + line + ansi.Reset
+	case strings.Contains(line, "(rapid)"):
+		// RIE internal logs — dim them.
+		return ansi.Gray + line + ansi.Reset
+	}
+	return line
+}
+
+func colorizeGin(line string) string {
+	m := reGinStatus.FindStringSubmatch(line)
+	if len(m) < 2 {
+		return line
+	}
+	switch m[1][0] {
+	case '2':
+		return ansi.Green + line + ansi.Reset
+	case '4':
+		return ansi.Yellow + line + ansi.Reset
+	case '5':
+		return ansi.Red + ansi.Bold + line + ansi.Reset
+	}
+	return line
+}
