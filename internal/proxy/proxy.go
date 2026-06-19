@@ -31,6 +31,7 @@ type Config struct {
 	CORS             bool          // send permissive CORS headers
 	RestartContainer string        // docker container to restart on invoke failure (optional)
 	TailContainers   []string      // docker containers to tail logs from (optional)
+	ExpandEscapes    bool          // unescape \n and \t in tailed log lines
 }
 
 // Run starts the proxy and blocks until the process receives SIGINT/SIGTERM or
@@ -45,7 +46,7 @@ func Run(cfg Config) error {
 	defer cancel()
 
 	for _, c := range cfg.TailContainers {
-		go logtail.Tail(ctx, c)
+		go logtail.Tail(ctx, c, cfg.ExpandEscapes)
 	}
 
 	srv := &server{

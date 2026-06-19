@@ -64,3 +64,17 @@ func TestColorize_Unrecognized(t *testing.T) {
 		t.Errorf("Colorize(%q) = %q, want unchanged", line, out)
 	}
 }
+
+func TestExpandEscapes(t *testing.T) {
+	cases := map[string]string{
+		`SELECT id,\n  name\nFROM t`: "SELECT id,\n  name\nFROM t",
+		`a\tb\tc`:                    "a\tb\tc",
+		`no escapes here`:            "no escapes here",
+		`mixed\nline\twith both`:     "mixed\nline\twith both",
+	}
+	for in, want := range cases {
+		if got := ExpandEscapes(in); got != want {
+			t.Errorf("ExpandEscapes(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

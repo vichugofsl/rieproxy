@@ -72,6 +72,7 @@ rieproxy [flags]
   --no-color            disable ANSI colors
   --restart-container   docker container to restart on failure     (optional, env RIEPROXY_RESTART_CONTAINER)
   --logs                docker container to tail logs from         (optional, repeatable)
+  --expand-escapes      expand literal \n and \t in tailed logs    (default false)
   --version             print version and exit
 ```
 

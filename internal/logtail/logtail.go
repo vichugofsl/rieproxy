@@ -21,11 +21,26 @@ var reGinStatus = regexp.MustCompile(`\|\s*(\d{3})\s*\|`)
 
 // Tail streams stdout+stderr from a docker container, colorizing each line and
 // writing it to stderr. It blocks until ctx is cancelled or the stream ends.
-func Tail(ctx context.Context, container string) {
+// When expandEscapes is true, literal "\n"/"\t" sequences in a line are turned
+// into real newlines/tabs before printing (handy for slog/JSON logs that embed
+// escaped SQL or stack traces).
+func Tail(ctx context.Context, container string, expandEscapes bool) {
 	prefix := ansi.Magenta + ansi.Bold + "[" + container + "]" + ansi.Reset + " "
 	tail(ctx, container, func(line string) {
+		if expandEscapes {
+			line = ExpandEscapes(line)
+		}
 		fmt.Fprintln(os.Stderr, prefix+Colorize(line))
 	})
+}
+
+// ExpandEscapes converts literal "\n" and "\t" two-character sequences into
+// real newlines and tabs. Structured loggers often emit embedded SQL, stack
+// traces, or JSON with escaped whitespace that is unreadable on a single line.
+func ExpandEscapes(s string) string {
+	s = strings.ReplaceAll(s, `\n`, "\n")
+	s = strings.ReplaceAll(s, `\t`, "\t")
+	return s
 }
 
 func tail(ctx context.Context, container string, process func(string)) {

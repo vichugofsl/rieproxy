@@ -57,6 +57,7 @@ func main() {
 	timeout := flag.Duration("timeout", envDuration("RIEPROXY_TIMEOUT", 300*time.Second), "per-invocation timeout")
 	cors := flag.Bool("cors", true, "send permissive CORS headers (local-dev convenience)")
 	noColor := flag.Bool("no-color", false, "disable ANSI colors in output")
+	expandEscapes := flag.Bool("expand-escapes", false, `expand literal \n and \t in tailed --logs into real newlines/tabs`)
 	restart := flag.String("restart-container", env("RIEPROXY_RESTART_CONTAINER", ""), "docker container to restart if an invocation fails (optional)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
@@ -78,6 +79,7 @@ func main() {
 		CORS:             *cors,
 		RestartContainer: *restart,
 		TailContainers:   tail,
+		ExpandEscapes:    *expandEscapes,
 	}
 	if err := proxy.Run(cfg); err != nil {
 		fmt.Fprintln(os.Stderr, "rieproxy:", err)
