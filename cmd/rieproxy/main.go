@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -16,8 +17,25 @@ import (
 	"github.com/vichugofsl/rieproxy/internal/proxy"
 )
 
-// version is overridden at build time via -ldflags "-X main.version=...".
+// version is overridden at build time via -ldflags "-X main.version=..." (how
+// GoReleaser stamps releases). When unset, resolveVersion falls back to the
+// module version recorded by `go install <pkg>@<version>`.
 var version = "dev"
+
+// resolveVersion reports the build version, preferring the ldflags value, then
+// the module version from the build info (set by `go install ...@vX.Y.Z`), then
+// "dev" for plain `go build`/`go run`.
+func resolveVersion() string {
+	if version != "dev" {
+		return version
+	}
+	if info, ok := debug.ReadBuildInfo(); ok {
+		if v := info.Main.Version; v != "" && v != "(devel)" {
+			return v
+		}
+	}
+	return version
+}
 
 // stringList collects a repeatable flag into a slice.
 type stringList []string
@@ -44,7 +62,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Println("rieproxy", version)
+		fmt.Println("rieproxy", resolveVersion())
 		return
 	}
 	if *noColor {
