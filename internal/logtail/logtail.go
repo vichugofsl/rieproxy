@@ -74,9 +74,12 @@ func tail(ctx context.Context, container string, process func(string)) {
 	_ = cmd.Wait()
 }
 
-// Colorize applies generic colorization to a single log line: slog-style
-// "level=" lines, Gin request logs, Gin debug output, and Lambda lifecycle
-// markers. Unrecognized lines are returned unchanged.
+// Colorize applies best-effort, project-agnostic colorization to a single log
+// line by recognizing widely-used formats: Go slog text ("level=..."), Gin
+// request/debug logs, AWS Lambda lifecycle markers (START/END/REPORT), and the
+// RIE's internal "(rapid)" lines. These are heuristics, not requirements — any
+// line that doesn't match (logs from another language, framework, or format) is
+// returned unchanged, so tailing works for any RIE-backed function.
 func Colorize(line string) string {
 	switch {
 	case strings.Contains(line, "level=ERROR"):

@@ -57,20 +57,20 @@ func TestSourceIP(t *testing.T) {
 // --- v1 request ---
 
 func TestV1_BuildRequest_GET(t *testing.T) {
-	r := httptest.NewRequest(http.MethodGet, "/api/bibles?lang=eng&page=1&page=2", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/items?status=active&page=1&page=2", nil)
 	r.RemoteAddr = "192.168.1.1:54321"
 
 	ev, err := buildV1Request(r)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ev.HTTPMethod != http.MethodGet || ev.Path != "/api/bibles" {
+	if ev.HTTPMethod != http.MethodGet || ev.Path != "/api/items" {
 		t.Errorf("method/path = %q %q", ev.HTTPMethod, ev.Path)
 	}
 	if ev.Body != "" || ev.IsBase64Encoded {
 		t.Errorf("expected empty unencoded body, got %q b64=%v", ev.Body, ev.IsBase64Encoded)
 	}
-	if ev.QueryStringParameters["lang"] != "eng" || ev.QueryStringParameters["page"] != "1" {
+	if ev.QueryStringParameters["status"] != "active" || ev.QueryStringParameters["page"] != "1" {
 		t.Errorf("single query params wrong: %v", ev.QueryStringParameters)
 	}
 	if got := ev.MultiValueQueryStringParameters["page"]; len(got) != 2 || got[0] != "1" || got[1] != "2" {
@@ -86,7 +86,7 @@ func TestV1_BuildRequest_GET(t *testing.T) {
 
 func TestV1_BuildRequest_PostJSON(t *testing.T) {
 	body := `{"name":"test"}`
-	r := httptest.NewRequest(http.MethodPost, "/api/bibles", strings.NewReader(body))
+	r := httptest.NewRequest(http.MethodPost, "/api/items", strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 
 	ev, err := buildV1Request(r)
